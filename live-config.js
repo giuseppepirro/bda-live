@@ -21,7 +21,7 @@
       const held = document.getElementById('bda-identity-hold');
       if (held) held.id = 'app';
       const script = document.createElement('script');
-      script.src = `identity-bootstrap.js?v=20260915-matricola-key-${Date.now()}`;
+      script.src = `student-key-bootstrap.js?v=20260915-hash-${Date.now()}`;
       document.body.appendChild(script);
     }, 0);
   }
