@@ -10,7 +10,8 @@ window.BDA_CONFIG = {
 
   // Dynamic question bank in rows 4-43, columns A:H:
   // ID, Week, Type, Question, Options, Correct answer, Teaching cue, Source.
-  questionsCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&sheet=BDA%20LIVE%20Config&range=A4:H43',
+  // headers=0 prevents GViz from mistaking Q1 for a header row.
+  questionsCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&headers=0&sheet=BDA%20LIVE%20Config&range=A4:H43',
 
   // The Google Form writes responses here. The frontend parses values stored as Qx|||answer.
   responsesCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&sheet=Risposte%20del%20modulo%201',
