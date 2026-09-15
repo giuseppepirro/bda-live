@@ -13,6 +13,7 @@
   c.registrationRetryMs = 8000;
   c.actionPendingTimeoutMs = 15000;
   c.studentKeyTimeoutMs = 4500;
+  c.studentKeyEndpoint = 'https://script.google.com/macros/s/AKfycbx1WFq39rAT0CAAOAdsiM3GKpm9_zN_l40SbS0Srti29-j9iQtv4UBUkeC_G66YLFkI/exec';
 
   const style = document.createElement('style');
   style.textContent = '.identity-chip{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}';
