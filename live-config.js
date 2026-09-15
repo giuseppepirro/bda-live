@@ -13,6 +13,10 @@
   c.registrationRetryMs = 8000;
   c.actionPendingTimeoutMs = 15000;
 
+  const style = document.createElement('style');
+  style.textContent = '.identity-chip{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}';
+  document.head.appendChild(style);
+
   const studentView = new URLSearchParams(location.search).get('view') !== 'present';
   if (studentView) {
     const root = document.getElementById('app');
