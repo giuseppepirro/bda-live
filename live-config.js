@@ -12,6 +12,7 @@
   c.studentPollMs = 1800;
   c.registrationRetryMs = 8000;
   c.actionPendingTimeoutMs = 15000;
+  c.studentKeyTimeoutMs = 4500;
 
   const style = document.createElement('style');
   style.textContent = '.identity-chip{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}';
@@ -25,7 +26,7 @@
       const held = document.getElementById('bda-identity-hold');
       if (held) held.id = 'app';
       const script = document.createElement('script');
-      script.src = `student-key-bootstrap.js?v=20260915-hash-${Date.now()}`;
+      script.src = `student-key-hmac-bootstrap.js?v=20260915-hmac-ready-${Date.now()}`;
       document.body.appendChild(script);
     }, 0);
   }
