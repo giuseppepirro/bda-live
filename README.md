@@ -19,6 +19,17 @@ Questions are read live from the Google Sheet **BDA LIVE Config**.
 
 Changing `B1` during class switches both the student and presenter views automatically. Adding or editing question text/options in rows 4–43 does not require a code change.
 
+### Pause / disable submissions
+
+Set `B1` to `OFF` to pause BDA LIVE. No question row named `OFF` is required.
+
+While paused:
+
+- student inputs disappear;
+- submissions are disabled;
+- the student and presenter views show `Waiting for the next question…`;
+- changing `B1` back to any valid question ID automatically resumes the session.
+
 ## Architecture
 
 The frontend is hosted on GitHub Pages. Google Forms is used for anonymous submissions and Google Sheets is used as the live data source.
