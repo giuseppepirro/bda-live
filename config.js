@@ -1,15 +1,15 @@
 window.BDA_CONFIG = {
-  // Google Form public submission endpoint, e.g. https://docs.google.com/forms/d/e/.../formResponse
+  // Google Form public submission endpoint. Filled in after we resolve the public responder URL.
   formAction: '',
 
   // Entry name for the single short-answer field, e.g. entry.123456789
   formEntry: '',
 
-  // Published CSV containing active question in A2 (header in A1)
-  controlCsv: '',
+  // Public CSV for the control sheet. Active question is B1; the frontend reads row 1, column 2.
+  controlCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&sheet=BDA%20LIVE%20Config&range=A1:B2',
 
-  // Published CSV containing response rows
-  responsesCsv: '',
+  // Public CSV for BDA LIVE Responses.
+  responsesCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&sheet=BDA%20LIVE%20Responses',
 
   // Zero-based columns in responsesCsv for QuestionID and Answer
   responseQuestionColumn: 1,
