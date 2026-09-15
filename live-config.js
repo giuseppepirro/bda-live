@@ -12,4 +12,17 @@
   c.studentPollMs = 1800;
   c.registrationRetryMs = 8000;
   c.actionPendingTimeoutMs = 15000;
+
+  const studentView = new URLSearchParams(location.search).get('view') !== 'present';
+  if (studentView) {
+    const root = document.getElementById('app');
+    if (root) root.id = 'bda-identity-hold';
+    setTimeout(() => {
+      const held = document.getElementById('bda-identity-hold');
+      if (held) held.id = 'app';
+      const script = document.createElement('script');
+      script.src = `identity-bootstrap.js?v=20260915-matricola-key-${Date.now()}`;
+      document.body.appendChild(script);
+    }, 0);
+  }
 })();
