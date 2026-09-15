@@ -1,6 +1,6 @@
 window.BDA_CONFIG = {
-  // Google Form public submission endpoint. Filled in after we resolve the public responder URL.
-  formAction: '',
+  // Google Form public submission endpoint.
+  formAction: 'https://docs.google.com/forms/d/e/1FAIpQLSfm5t9i2_dXrORyO_P5PlRXihoyspVBsIkmYXjtx6KNONqDzw/formResponse',
 
   // Entry name for the single short-answer field, e.g. entry.123456789
   formEntry: '',
