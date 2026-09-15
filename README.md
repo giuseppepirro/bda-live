@@ -7,21 +7,26 @@ Public live classroom interaction frontend for **Big Data Analytics and Reasonin
 - Student view: `https://giuseppepirro.github.io/bda-live/`
 - Presenter view: `https://giuseppepirro.github.io/bda-live/?view=present`
 
-## Interaction modes
+## Dynamic question bank
 
-- Q1 — word cloud
-- Q2 — interest poll
-- Q3 — assessment-route poll
-- Q4 — open exit ticket
+Questions are read live from the Google Sheet **BDA LIVE Config**.
+
+- `B1` contains the active question ID.
+- Question rows are `4:43`, columns `A:H`.
+- Columns are: `ID`, `Week`, `Type`, `Question`, `Options`, `Correct answer`, `Teaching cue`, `Source`.
+- `Options` are pipe-separated (`A|B|C|D`).
+- Supported frontend interaction types are `POLL`, `OPEN`, and `WORDCLOUD`.
+
+Changing `B1` during class switches both the student and presenter views automatically. Adding or editing question text/options in rows 4–43 does not require a code change.
 
 ## Architecture
 
 The frontend is hosted on GitHub Pages. Google Forms is used for anonymous submissions and Google Sheets is used as the live data source.
 
-`config.js` contains the four questions and the Google backend endpoints. The page intentionally contains no student identity collection.
+The existing Google Form backend is preserved. The frontend submits through `entry.136156598` and encodes each answer as:
 
-## Google backend setup still required
+`Qx|||answer`
 
-The existing Google Form can be reused as a single transport field. The frontend submits values encoded with the active question ID. The linked response sheet must expose a public CSV view so the presentation page can aggregate responses live.
+The response sheet is then read back by the presenter view and filtered by the currently active question ID.
 
-Once the Google endpoint and published CSV URL are inserted into `config.js`, the same QR can be used throughout the lecture.
+`config.js` contains only backend/data-source configuration; the question bank itself is no longer hard-coded in the repository.
