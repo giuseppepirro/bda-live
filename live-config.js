@@ -1,6 +1,7 @@
 (() => {
   const c = window.BDA_CONFIG || (window.BDA_CONFIG = {});
-  c.questionsCsv = String(c.questionsCsv || '').replace('range=A4:H43', 'range=A4:I43');
+  c.questionsCsv = String(c.questionsCsv || '')
+    .replace(/range=A4:[HI]\d+/i, 'range=A4:I60');
   if (c.responsesCsv && !c.responsesCsv.includes('headers=')) {
     c.responsesCsv += (c.responsesCsv.includes('?') ? '&' : '?') + 'headers=1';
   }
