@@ -366,6 +366,11 @@
     if (reg.status === 'CONFLICT_STUDENT') { clearIdentity(); return renderIdentityGate(model,`That matricola is already registered with nickname ${reg.expected}.`); }
     if (reg.status === 'CONFLICT_NICK') { clearIdentity(); return renderIdentityGate(model,'That nickname belongs to another matricola.'); }
     const identity = `${reg.nickname} · ${reg.studentId}`;
+    const registrationValue=String(CFG.registrationControlValue||'REGISTRATION').trim().toUpperCase();
+    if(String(model.activeId||'').trim().toUpperCase()===registrationValue && reg.status==='CONFIRMED'){
+      ui.root.innerHTML = shell('<section class="status-panel"><div class="status-icon success">✓</div><h2>You\'re already registered</h2><p>Your classroom nickname is <strong>'+esc(reg.nickname)+'</strong>. Wait for the instructor to continue.</p></section>',{identity:reg.nickname,kicker:'REGISTRATION OPEN'});
+      return;
+    }
     if (reg.status === 'PENDING') {
       ui.root.innerHTML = shell(`<section class="status-panel"><div class="spinner"></div><h2>Registering ${esc(reg.nickname)}…</h2><p>Checking matricola and nickname.</p></section>`,{identity,kicker:'CONNECTING'});
       return;
@@ -465,6 +470,13 @@
 
   function renderPresenter(model) {
     reconcilePending(model);
+    const registrationValue=String(CFG.registrationControlValue||'REGISTRATION').trim().toUpperCase();
+    if(String(model.activeId||'').trim().toUpperCase()===registrationValue){
+      if(!ui.root.querySelector('[data-registration-presenter]')){
+        ui.root.innerHTML=shell('<section class="status-panel presenter-wait"><h2>Student registration is open</h2><p>Waiting for registrations…</p></section>',{kicker:'PRESENTER · REGISTRATION OPEN',title:'Student registration'});
+      }
+      return;
+    }
     if(model.off){ui.root.innerHTML=shell(`${controls(model,null,null)}<section class="status-panel presenter-wait"><h2>Waiting for next question…</h2><p>B1 is set to OFF.</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside>`,{kicker:'PRESENTER · PAUSED',title:'BDA LIVE'});bindControls(model,null);return;}
     const q=model.activeQuestion;
     if(!q){ui.root.innerHTML=shell('<section class="status-panel"><h2>Selected question not found</h2></section>',{kicker:'PRESENTER · SETUP ISSUE'});return;}
