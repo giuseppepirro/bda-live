@@ -263,7 +263,7 @@
   }
 
   function patchDom() {
-    if (VIEW === 'student') patchStudent(); else patchPresenter();
+    if (VIEW === 'student') patchStudent();
   }
 
   async function poll() {
@@ -300,9 +300,11 @@
   }
 
   injectStyles();
-  const observer = new MutationObserver(() => queueMicrotask(patchDom));
-  observer.observe(document.body,{childList:true,subtree:true});
-  poll();
-  setInterval(poll, VIEW === 'present' ? 900 : 1400);
+  if (VIEW === 'student') {
+    const observer = new MutationObserver(() => queueMicrotask(patchDom));
+    observer.observe(document.body,{childList:true,subtree:true});
+    poll();
+    setInterval(poll, 1400);
+  }
   window.BDA_CLOUD_TEST = {normalizeCloudAnswer,fontSize};
 })();
