@@ -28,7 +28,8 @@
     roundsCache: null,
     roundsAt: 0,
     lastDeadline: NaN,
-    lastStudentSignature: ''
+    lastStudentSignature: '',
+    previewActiveId: ''
   };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -423,10 +424,10 @@
     `;document.head.appendChild(s);
   }
 
-  async function poll(){
+  async function poll(forcedActiveId){
     if(state.busy)return;state.busy=true;
     try{
-      const activeId=await loadActiveId();state.activeId=activeId;
+      const activeId=String(forcedActiveId||state.previewActiveId||await loadActiveId()).trim();state.activeId=activeId;
       if(!isRoundId(activeId)){restoreBase();return;}
       const [rounds,questions,events]=await Promise.all([loadRounds(),loadQuestions(),loadEvents()]);
       const rid=roundIdFrom(activeId),round=rounds.get(rid);if(!round){restoreBase();return;}
@@ -454,9 +455,28 @@
     document.querySelectorAll('#app [data-round-deadline]').forEach(el=>{const d=Number(el.dataset.roundDeadline);if(Number.isFinite(d))el.textContent=String(Math.max(0,Math.ceil((d-Date.now())/1000)));});
   }
 
+  if(VIEW==='present'){
+    window.addEventListener('bda-presenter-active-preview',event=>{
+      const value=String(event?.detail?.value||'').trim();
+      state.previewActiveId=value;
+      if(isRoundId(value)){
+        if(ensureRootSwap()){
+          state.roundRoot.innerHTML=shell('<section class="status-panel"><div class="spinner"></div><h2>Loading selected round…</h2></section>',{kicker:'PRESENTER · SWITCHING',title:value.replace(/^ROUND:/i,'')});
+        }
+        poll(value);
+      }else{
+        restoreBase();
+      }
+    });
+    window.addEventListener('bda-presenter-active-confirmed',event=>{
+      const value=String(event?.detail?.value||'').trim();
+      if(state.previewActiveId===value)setTimeout(()=>{if(state.previewActiveId===value)state.previewActiveId='';},1800);
+    });
+  }
+
   injectStyles();
   poll();
-  setInterval(poll,VIEW==='present'?900:1300);
+  setInterval(()=>poll(),VIEW==='present'?900:1300);
   setInterval(tick,250);
   window.BDA_ROUNDS_TEST={isRoundId,roundIdFrom,normalizeCloudAnswer};
 })();
