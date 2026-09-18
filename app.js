@@ -433,6 +433,47 @@
     return `<div class="response-grid">${session.validAnswers.slice().reverse().slice(0,18).map(a=>`<div class="response-card"><span>${esc(a.answer)}</span><small>${esc(a.nickname)}</small></div>`).join('')}</div>`;
   }
 
+  function normalizeCloudAnswer(value) {
+    let display=String(value??'').normalize('NFKC').trim().replace(/\s+/g,' ');
+    display=display.replace(/^[\s.,;:!?"'“”‘’()[\]{}]+|[\s.,;:!?"'“”‘’()[\]{}]+$/g,'').trim();
+    const normalized=display.replace(/[-‐‑‒–—]+/g,' ').replace(/\s+/g,' ').toLocaleLowerCase();
+    return {display,normalized};
+  }
+
+  function cloudGroups(session) {
+    const grouped=new Map();
+    session.validAnswers.forEach(a=>{
+      const n=normalizeCloudAnswer(a.answer);
+      if(!n.normalized)return;
+      const row=grouped.get(n.normalized)||{normalized:n.normalized,text:n.display,count:0};
+      row.count++;
+      grouped.set(n.normalized,row);
+    });
+    return [...grouped.values()].sort((a,b)=>b.count-a.count||a.text.localeCompare(b.text));
+  }
+
+  function cloudFontSize(count) {
+    return Math.max(30,Math.min(104,Math.round(30+18*Math.log2(Math.max(1,count)))));
+  }
+
+  function cloudRotation(text) {
+    let h=0;
+    for(const ch of text) h=((h<<5)-h+ch.codePointAt(0))|0;
+    return [-4,0,4][Math.abs(h)%3];
+  }
+
+  function renderWordCloud(session) {
+    const items=cloudGroups(session);
+    if(!items.length)return '<div class="cloud-empty">Waiting for words…</div>';
+    return `<div class="cloud-visual">${items.map(item=>`<span class="cloud-word" style="font-size:${cloudFontSize(item.count)}px;transform:rotate(${cloudRotation(item.normalized)}deg)" title="${item.count} response${item.count===1?'':'s'}">${esc(item.text)}${item.count>1?`<sup>${item.count}</sup>`:''}</span>`).join('')}</div>`;
+  }
+
+  function renderWordFrequency(session) {
+    const items=cloudGroups(session);
+    if(!items.length)return '<div class="empty-mini">No responses yet.</div>';
+    return `<div class="cloud-frequency">${items.slice(0,10).map(item=>`<div class="cloud-frequency-row"><span>${esc(item.text)}</span><strong>${item.count}</strong></div>`).join('')}</div>`;
+  }
+
   function renderFastest(session) {
     if (!session.correctAnswers.length) return '<div class="empty-mini">No correct answers.</div>';
     const groups = [];
@@ -481,10 +522,11 @@
     if(!session){ui.root.innerHTML=shell(`${controls(model,null,null)}<div class="presenter-grid"><section class="stage-card prepared-card"><div class="big-ready">READY</div><p>${q.duration}s · ${esc(q.type)}</p><p class="cue">${esc(q.teachingCue)}</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question});bindControls(model,null);return;}
     const timing=sessionTiming(session),closed=timing.state==='CLOSED';
     const scoredQuiz=q.type==='POLL'&&!!session.correctAnswer;
-    const results=q.type==='POLL'?renderPoll(session,q,closed):renderOther(session);
+    const results=q.type==='POLL'?renderPoll(session,q,closed):(q.type==='WORDCLOUD'?renderWordCloud(session):renderOther(session));
     const reveal=closed&&scoredQuiz?`<div class="correct-reveal"><span>Correct answer</span><strong>${esc(session.correctAnswer)}</strong></div>`:'';
     const fastest=closed&&scoredQuiz?`<section class="mini-card"><h3>Fastest correct</h3>${renderFastest(session)}</section>`:'';
-    ui.root.innerHTML=shell(`${controls(model,session,timing)}<div class="presenter-status-row">${timerHtml(session)}<div class="response-count"><strong>${session.validAnswers.length}</strong><span>RESPONSES</span></div><div class="state-pill ${closed?'closed':'open'}">${closed?'CLOSED':'OPEN'}</div></div>${reveal}<div class="presenter-grid"><section class="stage-card">${results}</section><aside class="side-panel">${fastest}<section class="mini-card"><h3>Leaderboard</h3>${renderLeaderboard(model)}</section><section class="mini-card teacher-note"><h3>Teaching cue</h3><p>${esc(q.teachingCue)}</p><small>${esc(q.source)}</small></section></aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question});
+    const cloudSide=q.type==='WORDCLOUD'?`<section class="mini-card"><h3>Word frequency</h3>${renderWordFrequency(session)}</section>`:'';
+    ui.root.innerHTML=shell(`${controls(model,session,timing)}<div class="presenter-status-row">${timerHtml(session)}<div class="response-count"><strong>${session.validAnswers.length}</strong><span>RESPONSES</span></div><div class="state-pill ${closed?'closed':'open'}">${closed?'CLOSED':'OPEN'}</div></div>${reveal}<div class="presenter-grid"><section class="stage-card ${q.type==='WORDCLOUD'?'cloud-stage-card':''}">${results}</section><aside class="side-panel">${cloudSide}${fastest}<section class="mini-card"><h3>Leaderboard</h3>${renderLeaderboard(model)}</section><section class="mini-card teacher-note"><h3>Teaching cue</h3><p>${esc(q.teachingCue)}</p><small>${esc(q.source)}</small></section></aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question});
     bindControls(model,session);
   }
 
