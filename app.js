@@ -509,21 +509,26 @@
 
   function controls(model,session,timing) {
     const pending=ui.pendingAction;
-    return `<div class="presenter-controls"><button id="startQuestion" class="primary control" ${model.off||!model.activeQuestion||(session&&timing?.state==='OPEN')||pending?.type==='START'?'disabled':''}>${pending?.type==='START'?'STARTING…':'START QUESTION'}</button><button id="endQuestion" class="secondary control" ${!session||timing?.state!=='OPEN'||pending?.type==='END'?'disabled':''}>${pending?.type==='END'?'ENDING…':'END NOW'}</button><button id="resetQuestion" class="ghost control" ${!session||pending?.type==='RESET'?'disabled':''}>${pending?.type==='RESET'?'RESETTING…':'RESET / PREPARE NEXT'}</button></div>`;
+    const pendingHere = pending && (!pending.questionId || pending.questionId === model.activeQuestion?.id);
+    return `<div class="presenter-controls"><button id="startQuestion" class="primary control" ${model.off||!model.activeQuestion||(session&&timing?.state==='OPEN')||(pendingHere&&pending?.type==='START')?'disabled':''}>${pendingHere&&pending?.type==='START'?'STARTING…':'START QUESTION'}</button><button id="endQuestion" class="secondary control" ${!session||timing?.state!=='OPEN'||(pendingHere&&pending?.type==='END')?'disabled':''}>${pendingHere&&pending?.type==='END'?'ENDING…':'END NOW'}</button><button id="resetQuestion" class="ghost control" ${!session||(pendingHere&&pending?.type==='RESET')?'disabled':''}>${pendingHere&&pending?.type==='RESET'?'RESETTING…':'RESET / PREPARE NEXT'}</button></div>`;
   }
 
   function reconcilePending(model) {
     if (!ui.pendingAction) return;
     const p=ui.pendingAction;
+    if (p.questionId && model.activeQuestion && p.questionId !== model.activeQuestion.id) {
+      ui.pendingAction=null;
+      return;
+    }
     const found=model.events.some(e=>(p.type==='START'&&e.type==='START'&&e.sessionId===p.sessionId)||(p.type==='END'&&e.type==='END'&&e.sessionId===p.sessionId)||(p.type==='RESET'&&e.type==='RESET'&&e.sessionId===p.sessionId));
     if(found||Date.now()-p.at>(CFG.actionPendingTimeoutMs||15000)) ui.pendingAction=null;
   }
 
   function bindControls(model,session) {
     const start=document.getElementById('startQuestion'),end=document.getElementById('endQuestion'),reset=document.getElementById('resetQuestion');
-    if(start&&!start.disabled) start.onclick=async()=>{const q=model.activeQuestion,sessionId=makeId('ses');ui.pendingAction={type:'START',sessionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'START',sessionId,questionId:q.id,questionType:q.type,duration:q.duration,correctAnswer:q.correctAnswer,launchSource:'Presenter'});}catch(e){ui.pendingAction=null;alert(`Could not start: ${e.message}`);}};
-    if(end&&!end.disabled) end.onclick=async()=>{ui.pendingAction={type:'END',sessionId:session.sessionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'END',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not end: ${e.message}`);}};
-    if(reset&&!reset.disabled) reset.onclick=async()=>{ui.pendingAction={type:'RESET',sessionId:session.sessionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'RESET',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not reset: ${e.message}`);}};
+    if(start&&!start.disabled) start.onclick=async()=>{const q=model.activeQuestion,sessionId=makeId('ses');ui.pendingAction={type:'START',sessionId,questionId:q.id,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'START',sessionId,questionId:q.id,questionType:q.type,duration:q.duration,correctAnswer:q.correctAnswer,launchSource:'Presenter'});}catch(e){ui.pendingAction=null;alert(`Could not start: ${e.message}`);}};
+    if(end&&!end.disabled) end.onclick=async()=>{ui.pendingAction={type:'END',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'END',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not end: ${e.message}`);}};
+    if(reset&&!reset.disabled) reset.onclick=async()=>{ui.pendingAction={type:'RESET',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'RESET',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not reset: ${e.message}`);}};
   }
 
   function renderPresenter(model) {
@@ -586,6 +591,8 @@
   function previewPresenterActive(value){
     if(VIEW!=='present'||!ui.lastModel)return;
     const active=String(value||'').trim();
+    ui.pendingAction=null;
+    ui.lastTimerState=null;
     if(/^ROUND:/i.test(active))return;
     ui.lastModel=buildModel(active,ui.lastModel.questions,ui.lastModel.events);
     renderPresenter(ui.lastModel);
