@@ -312,6 +312,7 @@
     const nicknameOwner = model.registrations.nicknameOwners.get(norm(nickname));
     if (studentOwner && norm(studentOwner.nickname) !== norm(nickname)) return {status:'CONFLICT_STUDENT',studentId,nickname,expected:studentOwner.nickname};
     if (nicknameOwner && String(nicknameOwner.matricola || nicknameOwner.studentId).trim() !== studentId) return {status:'CONFLICT_NICK',studentId,nickname};
+    if (/^(hmac256|sha256):[0-9a-f]{64}$/.test(studentId)) return {status:'CONFIRMED',studentId,nickname};
     return {status:studentOwner && nicknameOwner ? 'CONFIRMED':'PENDING',studentId,nickname};
   }
 
@@ -358,6 +359,13 @@
   }
 
   function renderStudent(model) {
+    const previousFocus = document.activeElement && document.activeElement.id === 'openAnswer'
+      ? {
+          sessionId: String(document.activeElement.dataset.sessionId || ''),
+          start: document.activeElement.selectionStart,
+          end: document.activeElement.selectionEnd
+        }
+      : null;
     const reg = registrationState(model);
     if (reg.status === 'NEEDS_IDENTITY') return renderIdentityGate(model);
     if (reg.status === 'CONFLICT_STUDENT') { clearIdentity(); return renderIdentityGate(model,`That matricola is already registered with nickname ${reg.expected}.`); }
@@ -400,12 +408,24 @@
       interaction = `<div class="options">${q.options.map(option=>`<button class="option ${selected===option?'selected':''}" type="button" data-answer="${esc(option)}">${esc(option)}</button>`).join('')}</div><button id="submitAnswer" class="primary" ${selected?'':'disabled'}>SUBMIT</button>`;
     } else {
       const draft = ui.draftBySession.get(session.sessionId) || '';
-      interaction = `<input id="openAnswer" class="text-answer" maxlength="160" autocomplete="off" placeholder="Your answer" value="${esc(draft)}"><button id="submitAnswer" class="primary" ${draft.trim()?'':'disabled'}>SUBMIT</button>`;
+      interaction = `<input id="openAnswer" data-session-id="${esc(session.sessionId)}" class="text-answer" maxlength="160" autocomplete="off" placeholder="Your answer" value="${esc(draft)}"><button id="submitAnswer" class="primary" ${draft.trim()?'':'disabled'}>SUBMIT</button>`;
     }
     ui.root.innerHTML = shell(`${timerHtml(session)}<section class="student-card live-card">${interaction}</section>`,{identity,kicker:`${q.id} · LIVE`,title:q.question});
     document.querySelectorAll('.option').forEach(button => button.addEventListener('click',()=>{ui.selectedBySession.set(session.sessionId,button.dataset.answer);ui.forceStudentRender=true;renderStudent(model);}));
     const input = document.getElementById('openAnswer');
-    if (input) input.addEventListener('input',()=>{ui.draftBySession.set(session.sessionId,input.value);document.getElementById('submitAnswer').disabled=!input.value.trim();});
+    if (input) {
+      input.addEventListener('input',()=>{ui.draftBySession.set(session.sessionId,input.value);document.getElementById('submitAnswer').disabled=!input.value.trim();});
+      if (previousFocus && previousFocus.sessionId === session.sessionId) {
+        input.focus({preventScroll:true});
+        try {
+          const end = input.value.length;
+          input.setSelectionRange(
+            Math.min(previousFocus.start == null ? end : previousFocus.start, end),
+            Math.min(previousFocus.end == null ? end : previousFocus.end, end)
+          );
+        } catch (_) {}
+      }
+    }
     const submit = document.getElementById('submitAnswer');
     if (submit) submit.addEventListener('click',async()=>{
       if (submit.disabled || sessionTiming(session).state !== 'OPEN') return;
