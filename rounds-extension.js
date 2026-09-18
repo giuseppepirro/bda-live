@@ -27,7 +27,8 @@
     autoEnding: new Set(),
     roundsCache: null,
     roundsAt: 0,
-    lastDeadline: NaN
+    lastDeadline: NaN,
+    lastStudentSignature: ''
   };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -271,7 +272,7 @@
     if(!state.swapped)return;
     if(state.roundRoot)state.roundRoot.remove();
     if(state.baseRoot){state.baseRoot.id='app';state.baseRoot.style.display='';}
-    state.roundRoot=null;state.baseRoot=null;state.swapped=false;state.run=null;state.round=null;state.lastDeadline=NaN;
+    state.roundRoot=null;state.baseRoot=null;state.swapped=false;state.run=null;state.round=null;state.lastDeadline=NaN;state.lastStudentSignature='';
   }
 
   function roundSessionFor(run,qid){return run?.sessions.find(s=>s.start.questionId===qid)||null;}
@@ -368,6 +369,15 @@
     bindPresenter(round,questions,run,t);
   }
 
+  function studentRoundSignature(round,questions,run){
+    const sid=getStudentId(),t=timing(round,run);
+    if(!run)return [round.id,'READY',sid].join('|');
+    const sessions=questions.map(q=>({q,s:roundSessionFor(run,q.id)})).filter(x=>x.s);
+    const doneCount=sessions.filter(x=>hasAnswered(x.s,sid)).length;
+    const current=sessions.find(x=>!hasAnswered(x.s,sid));
+    return [round.id,run.id,t.state,doneCount,current?current.q.id:'DONE',sid].join('|');
+  }
+
   function renderStudent(round,questions,run){
     const sid=getStudentId(),nickname=getNickname(),t=timing(round,run);
     if(!run){state.roundRoot.innerHTML=shell(`<section class="status-panel"><div class="status-icon ready">●</div><h2>Round ready</h2><p>Wait for the instructor to start.</p></section>`,{identity:nickname,kicker:round.mode==='PULSE'?'CLASS PULSE':'ROUND READY',title:round.label});return;}
@@ -427,7 +437,15 @@
       state.round=round;state.questions=qs;state.events=events;state.registrations=regs;state.run=run;
       reconcilePending(run);
       if(!qs.length){state.roundRoot.innerHTML=shell('<section class="status-panel"><h2>No questions assigned to this round</h2><p>Edit the Round column in BDA LIVE Config.</p></section>',{kicker:`ROUND ${round.id}`,title:round.label});return;}
-      if(VIEW==='present')renderPresenter(round,qs,run,events,regs);else renderStudent(round,qs,run);
+      if(VIEW==='present'){
+        renderPresenter(round,qs,run,events,regs);
+      }else{
+        const sig=studentRoundSignature(round,qs,run);
+        if(sig!==state.lastStudentSignature){
+          state.lastStudentSignature=sig;
+          renderStudent(round,qs,run);
+        }
+      }
     }catch(e){if(state.swapped&&state.roundRoot)state.roundRoot.innerHTML=shell(`<section class="status-panel error-panel"><h2>Round connection problem</h2><p>${esc(e.message)}</p><p>The page will retry automatically.</p></section>`,{kicker:'BDA LIVE ROUND'});console.warn('BDA rounds:',e);}
     finally{state.busy=false;}
   }
