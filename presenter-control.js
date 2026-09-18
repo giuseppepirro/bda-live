@@ -104,6 +104,15 @@ function build(){
   const weeks=[...new Set(questions.map(q=>q.week||'Questions'))];
   weeks.forEach(w=>questions.filter(q=>(q.week||'Questions')===w).forEach(q=>add(q.id,qLabel(q),w||'Questions')));
 
+  async function confirmViaSheet(value,waitMs){
+    const end=Date.now()+(waitMs||12000);
+    while(Date.now()<end){
+      try{if((await active())===value)return true;}catch(e){}
+      await new Promise(r=>setTimeout(r,650));
+    }
+    return false;
+  }
+
   async function activate(value){
     if(busy)return;
     const previous=lastActive;
@@ -113,9 +122,12 @@ function build(){
     window.BDA_ACTIVE_OVERRIDE=value;
     window.dispatchEvent(new CustomEvent('bda-presenter-active-preview',{detail:{value:value}}));
     try{
-      const d=await jsonp('setActive',{value:value},5000);
-      if(!d||!d.ok)throw new Error((d&&d.error)||'Could not activate activity');
-      lastActive=String(d.value||value);
+      let d=null;
+      try{d=await jsonp('setActive',{value:value},9000);}catch(e){}
+      let ok=!!(d&&d.ok);
+      if(!ok)ok=await confirmViaSheet(value,9000);
+      if(!ok)throw new Error('Could not confirm activity change');
+      lastActive=String((d&&d.value)||value);
       select.value=lastActive;
       status.textContent='Active ✓';
       window.dispatchEvent(new CustomEvent('bda-presenter-active-confirmed',{detail:{value:lastActive}}));
@@ -124,8 +136,8 @@ function build(){
       window.BDA_ACTIVE_OVERRIDE=previous||'';
       select.value=previous||select.value;
       window.dispatchEvent(new CustomEvent('bda-presenter-active-preview',{detail:{value:previous||'OFF'}}));
-      status.textContent='ERROR';
-      alert(e.message||String(e));
+      status.textContent='NOT SAVED';
+      console.warn('BDA presenter control:',e);
     }finally{
       busy=false;
       select.disabled=false;
