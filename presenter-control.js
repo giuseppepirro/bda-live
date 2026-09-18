@@ -38,9 +38,14 @@ function qLabel(q){
   return q.id+' · '+type+' · '+title;
 }
 function rLabel(r){
+  if(r.id==='LECTURE-FEEDBACK') return 'LECTURE FEEDBACK · Understanding check + saved history';
   let title=clean(r.label||r.id);
   if(title.length>70)title=title.slice(0,67)+'…';
   return 'ROUND:'+r.id+' · '+title;
+}
+function normalizeSelection(value){
+  const v=clean(value);
+  return v==='QFB' ? 'ROUND:LECTURE-FEEDBACK' : v;
 }
 async function loadOptions(){
   const [qr,rr]=await Promise.all([text(C.questionsCsv),text(C.roundsCsv)]);
@@ -102,7 +107,7 @@ function build(){
   add('REGISTRATION','REGISTRATION · Student registration','Classroom');
   rounds.forEach(r=>add('ROUND:'+r.id,rLabel(r),'Rounds'));
   const weeks=[...new Set(questions.map(q=>q.week||'Questions'))];
-  weeks.forEach(w=>questions.filter(q=>(q.week||'Questions')===w).forEach(q=>add(q.id,qLabel(q),w||'Questions')));
+  weeks.forEach(w=>questions.filter(q=>q.id!=='QFB'&&(q.week||'Questions')===w).forEach(q=>add(q.id,qLabel(q),w||'Questions')));
 
   async function confirmViaSheet(value,waitMs){
     const end=Date.now()+(waitMs||12000);
@@ -115,6 +120,7 @@ function build(){
 
   async function activate(value){
     if(busy)return;
+    value=normalizeSelection(value);
     const previous=lastActive;
     busy=true;
     select.disabled=true;
@@ -147,7 +153,7 @@ function build(){
 }
 async function sync(){
   try{
-    const a=await active();lastActive=a;if(window.BDA_ACTIVE_OVERRIDE===a)window.BDA_ACTIVE_OVERRIDE='';
+    const raw=await active();const a=normalizeSelection(raw);lastActive=a;if(window.BDA_ACTIVE_OVERRIDE===a)window.BDA_ACTIVE_OVERRIDE='';
     const s=document.getElementById('bdaPresenterSelect');if(s&&document.activeElement!==s)s.value=a;
     const st=document.querySelector('#bdaPresenterControl .ctl-status');if(st&&!busy)st.textContent='Active: '+a;
   }catch(e){}
