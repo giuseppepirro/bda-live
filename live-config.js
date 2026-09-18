@@ -15,7 +15,7 @@
   c.registrationControlValue = 'REGISTRATION';
   c.registrationPollMs = 1400;
   c.actionPendingTimeoutMs = 15000;
-  c.studentKeyTimeoutMs = 4500;
+  c.studentKeyTimeoutMs = 12000;
   c.studentKeyEndpoint = 'https://script.google.com/macros/s/AKfycbx1WFq39rAT0CAAOAdsiM3GKpm9_zN_l40SbS0Srti29-j9iQtv4UBUkeC_G66YLFkI/exec';
 
   const style = document.createElement('style');
