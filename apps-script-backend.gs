@@ -22,47 +22,75 @@ function handleStudentKey_(p) {
 }
 
 function handleRegisterStudent_(p) {
-  const token = String(p.token || '');
+  const token = String(p.token || '').trim();
   const matricola = normalizeMatricola_(p.matricola);
   if (!matricola) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Invalid matricola'});
+
   const key = hmacStudentKey_(matricola);
   const firstName = cleanHumanName_(p.firstName);
   const lastName = cleanHumanName_(p.lastName);
   const requestedNick = String(p.nickname || '').trim();
   const requestId = String(p.requestId || '').trim();
+  const requestedNorm = normalizeNickname_(requestedNick);
+
   const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
+  lock.waitLock(30000);
+  let result = null;
+
   try {
     const sheet = getRegistrySheet_();
     const lastRow = sheet.getLastRow();
     const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 8).getValues() : [];
     let existingIndex = -1, nicknameOwnerIndex = -1;
-    const requestedNorm = normalizeNickname_(requestedNick);
+
     for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0] || '').trim() === key) existingIndex = i;
-      if (requestedNorm && normalizeNickname_(rows[i][4]) === requestedNorm) nicknameOwnerIndex = i;
+      const existingKey = String(rows[i][0] || '').trim();
+      const existingNick = normalizeNickname_(rows[i][4]);
+      if (existingKey === key) existingIndex = i;
+      if (requestedNorm && existingNick === requestedNorm) nicknameOwnerIndex = i;
     }
+
     if (existingIndex >= 0) {
       const row = existingIndex + 2;
       const canonicalNick = String(rows[existingIndex][4] || '').trim();
       sheet.getRange(row, 7).setValue(new Date());
       sheet.getRange(row, 8).setValue('ACTIVE');
-      publishRegistrationEvent_(key, canonicalNick, requestId);
-      return frameReply_('BDA_REGISTER', token, {ok:true, key:key, nickname:canonicalNick, alreadyRegistered:true});
+      result = {ok:true, key:key, nickname:canonicalNick, alreadyRegistered:true};
+
+    } else if (!firstName) {
+      result = {ok:false, error:'Enter your name'};
+
+    } else if (!lastName) {
+      result = {ok:false, error:'Enter your surname'};
+
+    } else if (!/^[\p{L}\p{N}_.-]{2,24}$/u.test(requestedNick)) {
+      result = {ok:false, error:'Invalid nickname'};
+
+    } else if (nicknameOwnerIndex >= 0) {
+      result = {ok:false, error:'Nickname already used'};
+
+    } else {
+      const now = new Date();
+      sheet.appendRow([key, matricola, firstName, lastName, requestedNick, now, now, 'ACTIVE']);
+      result = {ok:true, key:key, nickname:requestedNick, alreadyRegistered:false};
     }
-    if (!firstName) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Enter your name'});
-    if (!lastName) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Enter your surname'});
-    if (!/^[\p{L}\p{N}_.-]{2,24}$/u.test(requestedNick)) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Invalid nickname'});
-    if (nicknameOwnerIndex >= 0) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Nickname already used'});
-    const now = new Date();
-    sheet.appendRow([key, matricola, firstName, lastName, requestedNick, now, now, 'ACTIVE']);
-    publishRegistrationEvent_(key, requestedNick, requestId);
-    return frameReply_('BDA_REGISTER', token, {ok:true, key:key, nickname:requestedNick, alreadyRegistered:false});
+
   } catch (err) {
-    return frameReply_('BDA_REGISTER', token, {ok:false, error:String(err && err.message || err)});
+    result = {ok:false, error:String(err && err.message || err)};
+
   } finally {
     lock.releaseLock();
   }
+
+  if (result && result.ok) {
+    try {
+      publishRegistrationEvent_(result.key, result.nickname, requestId);
+    } catch (err) {
+      return frameReply_('BDA_REGISTER', token, {ok:false, error:String(err && err.message || err)});
+    }
+  }
+
+  return frameReply_('BDA_REGISTER', token, result || {ok:false, error:'Registration failed'});
 }
 
 function publishRegistrationEvent_(key, nickname, requestId) {
