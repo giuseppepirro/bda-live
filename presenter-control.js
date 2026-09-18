@@ -72,7 +72,7 @@ function build(){
   if(document.getElementById('bdaPresenterControl'))return;
   const style=document.createElement('style');
   style.textContent=`
-    #bdaPresenterControl{position:sticky;top:0;z-index:10000;background:#111;color:#fff;padding:10px 16px;display:grid;grid-template-columns:auto minmax(260px,1fr) auto auto;gap:10px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.18);font-family:Arial,sans-serif}
+    #bdaPresenterControl{position:sticky;top:0;z-index:10000;background:#111;color:#fff;padding:10px 16px;display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:10px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.18);font-family:Arial,sans-serif}
     #bdaPresenterControl strong{font-size:12px;letter-spacing:.08em;white-space:nowrap}
     #bdaPresenterControl select{width:100%;min-width:0;padding:9px 10px;border-radius:9px;border:1px solid #555;background:#fff;color:#111;font-weight:700}
     #bdaPresenterControl button{padding:9px 14px;border:0;border-radius:9px;background:#b3131d;color:#fff;font-weight:900;cursor:pointer}
@@ -85,9 +85,8 @@ function build(){
   const host=document.createElement('div');host.id='bdaPresenterControl';
   const label=document.createElement('strong');label.textContent='ACTIVE ACTIVITY';
   const select=document.createElement('select');select.id='bdaPresenterSelect';
-  const btn=document.createElement('button');btn.id='bdaPresenterActivate';btn.textContent='ACTIVATE';
   const status=document.createElement('div');status.className='ctl-status';status.textContent='Ready';
-  host.append(label,select,btn,status);
+  host.append(label,select,status);
   document.body.insertBefore(host,document.body.firstChild);
 
   const add=(value,text,group)=>{
@@ -105,19 +104,38 @@ function build(){
   const weeks=[...new Set(questions.map(q=>q.week||'Questions'))];
   weeks.forEach(w=>questions.filter(q=>(q.week||'Questions')===w).forEach(q=>add(q.id,qLabel(q),w||'Questions')));
 
-  btn.onclick=async()=>{
-    if(busy)return;busy=true;btn.disabled=true;status.textContent='Activating…';
+  async function activate(value){
+    if(busy)return;
+    const previous=lastActive;
+    busy=true;
+    select.disabled=true;
+    status.textContent='Switching…';
+    window.BDA_ACTIVE_OVERRIDE=value;
+    window.dispatchEvent(new CustomEvent('bda-presenter-active-preview',{detail:{value:value}}));
     try{
-      const d=await jsonp('setActive',{value:select.value},5000);
+      const d=await jsonp('setActive',{value:value},5000);
       if(!d||!d.ok)throw new Error((d&&d.error)||'Could not activate activity');
-      lastActive=String(d.value||select.value);select.value=lastActive;status.textContent='Active ✓';
-    }catch(e){status.textContent='ERROR';alert(e.message||String(e));}
-    finally{busy=false;btn.disabled=false;}
-  };
+      lastActive=String(d.value||value);
+      select.value=lastActive;
+      status.textContent='Active ✓';
+      window.dispatchEvent(new CustomEvent('bda-presenter-active-confirmed',{detail:{value:lastActive}}));
+      setTimeout(()=>{ if(window.BDA_ACTIVE_OVERRIDE===lastActive) window.BDA_ACTIVE_OVERRIDE=''; },1800);
+    }catch(e){
+      window.BDA_ACTIVE_OVERRIDE=previous||'';
+      select.value=previous||select.value;
+      window.dispatchEvent(new CustomEvent('bda-presenter-active-preview',{detail:{value:previous||'OFF'}}));
+      status.textContent='ERROR';
+      alert(e.message||String(e));
+    }finally{
+      busy=false;
+      select.disabled=false;
+    }
+  }
+  select.onchange=()=>activate(select.value);
 }
 async function sync(){
   try{
-    const a=await active();lastActive=a;
+    const a=await active();lastActive=a;if(window.BDA_ACTIVE_OVERRIDE===a)window.BDA_ACTIVE_OVERRIDE='';
     const s=document.getElementById('bdaPresenterSelect');if(s&&document.activeElement!==s)s.value=a;
     const st=document.querySelector('#bdaPresenterControl .ctl-status');if(st&&!busy)st.textContent='Active: '+a;
   }catch(e){}
