@@ -5,6 +5,7 @@ const BDA_REGISTRY_TITLE = 'BDA LIVE - Student Registry (PRIVATE)';
 const BDA_PUBLIC_FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSfm5t9i2_dXrORyO_P5PlRXihoyspVBsIkmYXjtx6KNONqDzw/formResponse';
 const BDA_PUBLIC_FORM_ENTRY = 'entry.136156598';
 const BDA_PUBLIC_PROTOCOL = 'BDA2';
+const BDA_PUBLIC_EVENT_SHEET = 'Risposte del modulo 1';
 
 function doPost(e) {
   const p = (e && e.parameter) || {};
@@ -104,19 +105,14 @@ function publishRegistrationEvent_(key, nickname, requestId) {
     nickname: nickname,
     registrationRequestId: requestId || ''
   };
+
   const payload = BDA_PUBLIC_PROTOCOL + '|||' + encodeURIComponent(JSON.stringify(event));
-  const form = {};
-  form[BDA_PUBLIC_FORM_ENTRY] = payload;
-  const response = UrlFetchApp.fetch(BDA_PUBLIC_FORM_ACTION, {
-    method: 'post',
-    payload: form,
-    muteHttpExceptions: true,
-    followRedirects: true
-  });
-  const code = response.getResponseCode();
-  if (code < 200 || code >= 400) {
-    throw new Error('Could not publish registration acknowledgement (HTTP ' + code + ')');
-  }
+  const ss = SpreadsheetApp.openById('1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY');
+  const sheet = ss.getSheetByName(BDA_PUBLIC_EVENT_SHEET);
+  if (!sheet) throw new Error('Public event sheet not found: ' + BDA_PUBLIC_EVENT_SHEET);
+
+  sheet.appendRow([new Date(), payload]);
+  SpreadsheetApp.flush();
 }
 
 function getRegistrySheet_() {
