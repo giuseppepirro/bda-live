@@ -2,6 +2,9 @@ const BDA_HMAC_PROPERTY = 'BDA_STUDENT_HMAC_SECRET';
 const BDA_REGISTRY_ID_PROPERTY = 'BDA_STUDENT_REGISTRY_ID';
 const BDA_NAMESPACE = 'BDA-LIVE|UNICAL|2026-27|';
 const BDA_REGISTRY_TITLE = 'BDA LIVE - Student Registry (PRIVATE)';
+const BDA_PUBLIC_FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSfm5t9i2_dXrORyO_P5PlRXihoyspVBsIkmYXjtx6KNONqDzw/formResponse';
+const BDA_PUBLIC_FORM_ENTRY = 'entry.136156598';
+const BDA_PUBLIC_PROTOCOL = 'BDA2';
 
 function doPost(e) {
   const p = (e && e.parameter) || {};
@@ -26,6 +29,7 @@ function handleRegisterStudent_(p) {
   const firstName = cleanHumanName_(p.firstName);
   const lastName = cleanHumanName_(p.lastName);
   const requestedNick = String(p.nickname || '').trim();
+  const requestId = String(p.requestId || '').trim();
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -43,6 +47,7 @@ function handleRegisterStudent_(p) {
       const canonicalNick = String(rows[existingIndex][4] || '').trim();
       sheet.getRange(row, 7).setValue(new Date());
       sheet.getRange(row, 8).setValue('ACTIVE');
+      publishRegistrationEvent_(key, canonicalNick, requestId);
       return frameReply_('BDA_REGISTER', token, {ok:true, key:key, nickname:canonicalNick, alreadyRegistered:true});
     }
     if (!firstName) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Enter your name'});
@@ -51,11 +56,38 @@ function handleRegisterStudent_(p) {
     if (nicknameOwnerIndex >= 0) return frameReply_('BDA_REGISTER', token, {ok:false, error:'Nickname already used'});
     const now = new Date();
     sheet.appendRow([key, matricola, firstName, lastName, requestedNick, now, now, 'ACTIVE']);
+    publishRegistrationEvent_(key, requestedNick, requestId);
     return frameReply_('BDA_REGISTER', token, {ok:true, key:key, nickname:requestedNick, alreadyRegistered:false});
   } catch (err) {
     return frameReply_('BDA_REGISTER', token, {ok:false, error:String(err && err.message || err)});
   } finally {
     lock.releaseLock();
+  }
+}
+
+function publishRegistrationEvent_(key, nickname, requestId) {
+  const event = {
+    v: 2,
+    type: 'REGISTER',
+    studentId: key,
+    matricola: key,
+    studentKey: key,
+    studentIdKind: 'pseudonymous',
+    nickname: nickname,
+    registrationRequestId: requestId || ''
+  };
+  const payload = BDA_PUBLIC_PROTOCOL + '|||' + encodeURIComponent(JSON.stringify(event));
+  const form = {};
+  form[BDA_PUBLIC_FORM_ENTRY] = payload;
+  const response = UrlFetchApp.fetch(BDA_PUBLIC_FORM_ACTION, {
+    method: 'post',
+    payload: form,
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 400) {
+    throw new Error('Could not publish registration acknowledgement (HTTP ' + code + ')');
   }
 }
 
