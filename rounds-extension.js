@@ -29,7 +29,9 @@
     roundsAt: 0,
     lastDeadline: NaN,
     lastStudentSignature: '',
-    previewActiveId: ''
+    previewActiveId: '',
+    lastPresenterSignature: '',
+    lastPresenterRoundKey: ''
   };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -273,7 +275,7 @@
     if(!state.swapped)return;
     if(state.roundRoot)state.roundRoot.remove();
     if(state.baseRoot){state.baseRoot.id='app';state.baseRoot.style.display='';}
-    state.roundRoot=null;state.baseRoot=null;state.swapped=false;state.run=null;state.round=null;state.lastDeadline=NaN;state.lastStudentSignature='';
+    state.roundRoot=null;state.baseRoot=null;state.swapped=false;state.run=null;state.round=null;state.lastDeadline=NaN;state.lastStudentSignature='';state.lastPresenterSignature='';state.lastPresenterRoundKey='';
   }
 
   function roundSessionFor(run,qid){return run?.sessions.find(s=>s.start.questionId===qid)||null;}
@@ -349,10 +351,38 @@
     if(c&&!c.disabled)c.onclick=async()=>{try{await resetRun(run);}catch(e){state.pending=null;alert(`Could not reset round: ${e.message}`);}};
   }
 
+  function presenterRoundSignature(round,questions,run){
+    if(!run)return [round.id,'READY',state.pending?.type||''].join('|');
+    const t=timing(round,run);
+    const answers=questions.map(q=>{
+      const s=roundSessionFor(run,q.id);
+      return `${q.id}:${acceptedFor(s).map(a=>`${a.studentId}:${a.answer}`).join('¦')}`;
+    }).join('||');
+    return [round.id,run.id,t.state,answers,state.pending?.type||''].join('||');
+  }
+
+  function setRoundPresenterHtml(round,run,html){
+    const key=`${round.id}|${run?.id||'prepared'}`;
+    const same=state.lastPresenterRoundKey===key;
+    const y=same?window.scrollY:0;
+    const oldStage=same?document.querySelector('#app .round-stage'):null;
+    const stageY=oldStage?oldStage.scrollTop:0;
+    state.roundRoot.innerHTML=html;
+    state.lastPresenterRoundKey=key;
+    if(same){
+      requestAnimationFrame(()=>{
+        if(state.lastPresenterRoundKey!==key)return;
+        if(y>0)window.scrollTo(0,y);
+        const stage=document.querySelector('#app .round-stage');
+        if(stage&&stageY>0)stage.scrollTop=stageY;
+      });
+    }
+  }
+
   function renderPrepared(round,questions){
     const mode=round.mode==='PULSE'?'UNTIMED · NO POINTS':`${round.duration}s · ${questions.length} QUESTIONS · SCORED`;
     const side=round.mode==='PULSE'?`<aside class="side-panel"><section class="mini-card"><h3>Class pulse</h3><p>No correct/wrong answers. Students move through all interactions; close it with END NOW.</p></section></aside>`:`<aside class="side-panel"><section class="mini-card"><h3>Scoring</h3><p>1,000 points per correct answer. One common timer for the whole round.</p></section></aside>`;
-    state.roundRoot.innerHTML=shell(`${controls(round,null,null)}<div class="presenter-grid"><section class="stage-card prepared-card"><div class="big-ready">READY</div><p>${esc(mode)}</p><div class="round-question-list">${questions.map((q,i)=>`<span>${i+1}. ${esc(q.id)}</span>`).join('')}</div><p class="cue">${esc(round.notes)}</p></section>${side}</div>`,{kicker:`PRESENTER · ROUND ${round.id}`,title:round.label});
+    setRoundPresenterHtml(round,null,shell(`${controls(round,null,null)}<div class="presenter-grid"><section class="stage-card prepared-card"><div class="big-ready">READY</div><p>${esc(mode)}</p><div class="round-question-list">${questions.map((q,i)=>`<span>${i+1}. ${esc(q.id)}</span>`).join('')}</div><p class="cue">${esc(round.notes)}</p></section>${side}</div>`,{kicker:`PRESENTER · ROUND ${round.id}`,title:round.label}));
     bindPresenter(round,questions,null,null);
   }
 
@@ -366,7 +396,7 @@
     const timer=round.mode==='PULSE'?'<div class="round-untimed">UNTIMED · OPEN UNTIL END NOW</div>':`<div class="timer"><span class="timer-value" data-round-deadline="${run.deadline}">${Math.max(0,Math.ceil(t.remainingMs/1000))}</span><span class="timer-unit">s</span></div>`;
     const results=questions.map((q,index)=>{const s=roundSessionFor(run,q.id);const body=q.type==='POLL'?renderPollMini(s,q,closed,round.mode==='SCORED'):renderCloudMini(acceptedFor(s));return `<section class="round-result-card"><div class="round-result-head"><div><small>${index+1}/${questions.length} · ${esc(q.id)}</small><h3>${esc(q.question)}</h3></div><strong>${acceptedFor(s).length}</strong></div>${body}</section>`;}).join('');
     const side=round.mode==='PULSE'?`<aside class="side-panel"><section class="mini-card"><h3>Class pulse</h3><p><strong>${stats.participants}</strong> participating · <strong>${stats.complete}</strong> completed all ${questions.length}.</p><p>No points and no correct/wrong reveal.</p></section></aside>`:`<aside class="side-panel">${leaderboardHtml(roundStandings(run,round),'This round')}${leaderboardHtml(buildLeaderboard(events,registrations),'Overall leaderboard')}</aside>`;
-    state.roundRoot.innerHTML=shell(`${controls(round,run,t)}<div class="presenter-status-row">${timer}<div class="response-count"><strong>${stats.complete}</strong><span>COMPLETE</span></div><div class="response-count"><strong>${stats.participants}</strong><span>PLAYING</span></div><div class="state-pill ${closed?'closed':'open'}">${closed?'CLOSED':'OPEN'}</div></div><div class="presenter-grid round-presenter-grid"><section class="stage-card round-stage">${results}</section>${side}</div>`,{kicker:`PRESENTER · ROUND ${round.id}`,title:round.label});
+    setRoundPresenterHtml(round,run,shell(`${controls(round,run,t)}<div class="presenter-status-row">${timer}<div class="response-count"><strong>${stats.complete}</strong><span>COMPLETE</span></div><div class="response-count"><strong>${stats.participants}</strong><span>PLAYING</span></div><div class="state-pill ${closed?'closed':'open'}">${closed?'CLOSED':'OPEN'}</div></div><div class="presenter-grid round-presenter-grid"><section class="stage-card round-stage">${results}</section>${side}</div>`,{kicker:`PRESENTER · ROUND ${round.id}`,title:round.label}));
     bindPresenter(round,questions,run,t);
   }
 
@@ -439,7 +469,11 @@
       reconcilePending(run);
       if(!qs.length){state.roundRoot.innerHTML=shell('<section class="status-panel"><h2>No questions assigned to this round</h2><p>Edit the Round column in BDA LIVE Config.</p></section>',{kicker:`ROUND ${round.id}`,title:round.label});return;}
       if(VIEW==='present'){
-        renderPresenter(round,qs,run,events,regs);
+        const sig=presenterRoundSignature(round,qs,run);
+        if(sig!==state.lastPresenterSignature){
+          state.lastPresenterSignature=sig;
+          renderPresenter(round,qs,run,events,regs);
+        }
       }else{
         const sig=studentRoundSignature(round,qs,run);
         if(sig!==state.lastStudentSignature){
@@ -460,6 +494,8 @@
       const value=String(event?.detail?.value||'').trim();
       state.previewActiveId=value;
       if(isRoundId(value)){
+        state.lastPresenterSignature='';
+        state.lastPresenterRoundKey='';
         if(ensureRootSwap()){
           state.roundRoot.innerHTML=shell('<section class="status-panel"><div class="spinner"></div><h2>Loading selected round…</h2></section>',{kicker:'PRESENTER · SWITCHING',title:value.replace(/^ROUND:/i,'')});
         }
