@@ -185,12 +185,12 @@
   function deriveRegistrations(events) {
     const registrations = events
       .filter(e => e.type === 'REGISTER' && e.studentId && e.nickname)
-      .filter(e => e.studentIdKind === 'matricola' || e.matricola || !String(e.studentId).startsWith('stu-'))
+      .filter(e => /^(hmac256|sha256):[0-9a-f]{64}$/.test(String(e.studentKey || e.identityHash || e.matricola || e.studentId || '').trim()))
       .sort(eventOrder);
     const nicknameOwners = new Map();
     const studentOwners = new Map();
     registrations.forEach(event => {
-      const sid = String(event.matricola || event.studentId).trim();
+      const sid = String(event.studentKey || event.identityHash || event.matricola || event.studentId).trim();
       const nickKey = norm(event.nickname);
       if (!sid || !nickKey) return;
       if (!studentOwners.has(sid)) studentOwners.set(sid, event);
