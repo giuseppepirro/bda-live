@@ -11,6 +11,8 @@
   c.presenterPollMs = 1200;
   c.studentPollMs = 1800;
   c.registrationRetryMs = 8000;
+  c.registrationControlValue = 'REGISTRATION';
+  c.registrationPollMs = 1400;
   c.actionPendingTimeoutMs = 15000;
   c.studentKeyTimeoutMs = 4500;
   c.studentKeyEndpoint = 'https://script.google.com/macros/s/AKfycbx1WFq39rAT0CAAOAdsiM3GKpm9_zN_l40SbS0Srti29-j9iQtv4UBUkeC_G66YLFkI/exec';
@@ -27,7 +29,7 @@
       const held = document.getElementById('bda-identity-hold');
       if (held) held.id = 'app';
       const script = document.createElement('script');
-      script.src = `student-key-hmac-bootstrap.js?v=20260915-hmac-ready-${Date.now()}`;
+      script.src = `registration-bootstrap.js?v=20260918-registration-${Date.now()}`;
       document.body.appendChild(script);
     }, 0);
   }
