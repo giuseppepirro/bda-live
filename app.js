@@ -564,6 +564,11 @@
       }
       return;
     }
+    if(/^ROUND:/i.test(String(model.activeId||'').trim())){
+      if(ui.root && ui.root.id==='bda-base-app') return;
+      setPresenterHtml(model,shell('<section class="status-panel presenter-wait"><div class="spinner"></div><h2>Loading selected round…</h2><p>The round view is taking control.</p></section>',{kicker:'PRESENTER · ROUND',title:String(model.activeId||'').replace(/^ROUND:/i,'')}));
+      return;
+    }
     if(model.off){setPresenterHtml(model,shell(`${controls(model,null,null)}<section class="status-panel presenter-wait"><h2>Waiting for next question…</h2><p>B1 is set to OFF.</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside>`,{kicker:'PRESENTER · PAUSED',title:'BDA LIVE'}));bindControls(model,null);return;}
     const q=model.activeQuestion;
     if(!q){setPresenterHtml(model,shell('<section class="status-panel"><h2>Selected question not found</h2></section>',{kicker:'PRESENTER · SETUP ISSUE'}));return;}
@@ -621,7 +626,8 @@
 
   function previewPresenterActive(value){
     if(VIEW!=='present'||!ui.lastModel)return;
-    const active=String(value||'').trim();
+    let active=String(value||'').trim();
+    if(active==='QFB') active='ROUND:LECTURE-FEEDBACK';
     ui.pendingAction=null;
     ui.lastTimerState=null;
     if(/^ROUND:/i.test(active))return;
