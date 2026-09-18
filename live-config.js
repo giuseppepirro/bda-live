@@ -14,7 +14,9 @@
   c.registrationRetryMs = 8000;
   c.registrationControlValue = 'REGISTRATION';
   c.registrationPollMs = 1400;
-  c.registrationAckTimeoutMs = 10000;
+  c.registrationAckTimeoutMs = 7000;
+  c.registrationSubmitJitterMs = 2500;
+  c.registrationMaxAttempts = 3;
   c.registrationPresenterPollMs = 700;
   c.actionPendingTimeoutMs = 15000;
   c.studentKeyTimeoutMs = 25000;
