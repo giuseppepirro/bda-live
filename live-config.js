@@ -5,7 +5,8 @@
     c.responsesCsv += (c.responsesCsv.includes('?') ? '&' : '?') + 'headers=1';
   }
   c.responseTimestampColumn = 0;
-  c.protocolPrefix = 'BDA1';
+  c.protocolPrefix = 'BDA2';
+  c.productionCutover = '2026-09-21';
   c.defaultPollSeconds = 20;
   c.defaultOpenSeconds = 30;
   c.presenterPollMs = 1200;
