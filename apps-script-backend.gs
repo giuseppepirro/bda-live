@@ -123,6 +123,17 @@ function normalizeNickname_(value) {
 function frameReply_(source, token, payload) {
   const data = Object.assign({source:source, token:token}, payload || {});
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  const html = '<!doctype html><meta charset="utf-8"><script>parent.postMessage(' + json + ',"*");<\/script>';
-  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const html =
+    '<!doctype html><html><head><meta charset="utf-8"></head><body>' +
+    '<script>(function(){' +
+    'var d=' + json + ';' +
+    'var w=window;' +
+    'for(var i=0;i<8;i++){' +
+      'try{w.postMessage(d,"*");}catch(e){}' +
+      'try{if(w===w.parent)break;w=w.parent;}catch(e){break;}' +
+    '}' +
+    '})();<\/script>' +
+    '</body></html>';
+  return HtmlService.createHtmlOutput(html)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
