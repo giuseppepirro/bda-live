@@ -14,6 +14,8 @@
   let busy = false;
   let lastMarkup = '';
   let lastSignature = '';
+  const savedRuns = new Set();
+  const savingRuns = new Set();
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
@@ -62,6 +64,38 @@
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  function jsonp(op, params = {}, timeoutMs = 6000) {
+    return new Promise((resolve, reject) => {
+      const ep = String(CFG.studentKeyEndpoint || '').trim();
+      if (!ep) return reject(new Error('BDA control endpoint is not configured.'));
+      const cb = '__bda_feedback_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const s = document.createElement('script');
+      let done = false;
+      function clean() {
+        try { delete window[cb]; } catch (_) { window[cb] = undefined; }
+        s.remove();
+      }
+      function finish(fn, value) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        clean();
+        fn(value);
+      }
+      window[cb] = data => finish(resolve, data || {});
+      const u = new URL(ep, location.href);
+      u.searchParams.set('op', op);
+      u.searchParams.set('callback', cb);
+      Object.entries(params).forEach(([k,v]) => u.searchParams.set(k, String(v)));
+      u.searchParams.set('_feedback', Date.now() + '-' + Math.random().toString(36).slice(2,7));
+      s.src = u.toString();
+      s.async = true;
+      s.onerror = () => finish(reject, new Error('Feedback history service unavailable.'));
+      const timer = setTimeout(() => finish(reject, new Error('Feedback history timeout.')), timeoutMs);
+      document.head.appendChild(s);
+    });
   }
 
   function csvRows(text) {
@@ -176,6 +210,66 @@
     return runs;
   }
 
+  async function persistClosedRuns(runs) {
+    const closed = runs.filter(r => r.closed && r.id && !savedRuns.has(r.id) && !savingRuns.has(r.id));
+    for (const r of closed) {
+      savingRuns.add(r.id);
+      try {
+        const result = await jsonp('saveLectureFeedback', {
+          runId: r.id,
+          startMs: r.startMs,
+          everything: r.counts['Everything'] || 0,
+          p80: r.counts['80% to 99%'] || 0,
+          p50: r.counts['50% to 79%'] || 0,
+          under50: r.counts['Less than a half'] || 0
+        }, 9000);
+        if (result && result.ok) savedRuns.add(r.id);
+      } catch (e) {
+        console.warn('BDA feedback history save:', e);
+      } finally {
+        savingRuns.delete(r.id);
+      }
+    }
+  }
+
+  async function loadSavedHistory() {
+    try {
+      const result = await jsonp('lectureFeedbackHistory', {}, 7000);
+      if (!result || !result.ok || !Array.isArray(result.runs)) return [];
+      result.runs.forEach(r => { if (r && r.id) savedRuns.add(r.id); });
+      return result.runs.map(r => ({
+        id: String(r.id || ''),
+        lecture: String(r.lecture || ''),
+        startMs: Number(r.startMs) || NaN,
+        closed: true,
+        n: Number(r.n) || 0,
+        counts: {
+          'Everything': Number(r.counts?.['Everything']) || 0,
+          '80% to 99%': Number(r.counts?.['80% to 99%']) || 0,
+          '50% to 79%': Number(r.counts?.['50% to 79%']) || 0,
+          'Less than a half': Number(r.counts?.['Less than a half']) || 0
+        },
+        pct: {
+          'Everything': Number(r.pct?.['Everything']) || 0,
+          '80% to 99%': Number(r.pct?.['80% to 99%']) || 0,
+          '50% to 79%': Number(r.pct?.['50% to 79%']) || 0,
+          'Less than a half': Number(r.pct?.['Less than a half']) || 0
+        },
+        high: Number(r.high) || 0,
+        saved: true
+      })).filter(r => r.id);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function mergeHistory(saved, live) {
+    const merged = [...saved];
+    const ids = new Set(saved.map(r => r.id));
+    live.filter(r => !r.closed || !ids.has(r.id)).forEach(r => merged.push(r));
+    return merged.sort((a,b) => (a.startMs || 0) - (b.startMs || 0));
+  }
+
   function dateLabel(ms) {
     try {
       return new Intl.DateTimeFormat(undefined, {day: '2-digit', month: 'short'}).format(new Date(ms));
@@ -195,7 +289,7 @@
     const y = v => top + (100 - v) / 100 * plotH;
     const grid = [0, 25, 50, 75, 100].map(v => `<g><line x1="${left}" y1="${y(v)}" x2="${width - right}" y2="${y(v)}" class="feedback-gridline"/><text x="${left - 10}" y="${y(v) + 4}" text-anchor="end" class="feedback-axis">${v}%</text></g>`).join('');
     const points = runs.map((r, i) => `${x(i)},${y(r.high)}`).join(' ');
-    const dots = runs.map((r, i) => `<g><circle cx="${x(i)}" cy="${y(r.high)}" r="6" class="feedback-dot"/><text x="${x(i)}" y="${y(r.high) - 12}" text-anchor="middle" class="feedback-value">${Math.round(r.high)}%</text><text x="${x(i)}" y="${height - 24}" text-anchor="middle" class="feedback-x">L${i + 1}</text><text x="${x(i)}" y="${height - 8}" text-anchor="middle" class="feedback-date">${esc(dateLabel(r.startMs))}</text></g>`).join('');
+    const dots = runs.map((r, i) => `<g><circle cx="${x(i)}" cy="${y(r.high)}" r="6" class="feedback-dot"/><text x="${x(i)}" y="${y(r.high) - 12}" text-anchor="middle" class="feedback-value">${Math.round(r.high)}%</text><text x="${x(i)}" y="${height - 24}" text-anchor="middle" class="feedback-x">${esc(r.lecture || `L${i + 1}`)}</text><text x="${x(i)}" y="${height - 8}" text-anchor="middle" class="feedback-date">${esc(dateLabel(r.startMs))}</text></g>`).join('');
     return `<div class="feedback-chart-scroll"><svg class="feedback-chart" viewBox="0 0 ${width} ${height}" style="width:${width}px" role="img" aria-label="Historical percentage of students reporting at least 80 percent understanding">${grid}<polyline points="${points}" class="feedback-line"/>${dots}</svg></div>`;
   }
 
@@ -203,7 +297,7 @@
     if (!runs.length) return '';
     return `<div class="feedback-dist-list">${runs.map((r, i) => {
       const segs = OPTIONS.map((o, idx) => `<span class="feedback-seg s${idx + 1}" style="width:${r.pct[o]}%" title="${esc(o)}: ${Math.round(r.pct[o])}%"></span>`).join('');
-      return `<div class="feedback-dist-row"><div class="feedback-dist-label"><strong>L${i + 1}</strong><span>${esc(dateLabel(r.startMs))}</span><em>${r.n} responses${r.closed ? '' : ' · LIVE'}</em></div><div class="feedback-stack">${segs}</div></div>`;
+      return `<div class="feedback-dist-row"><div class="feedback-dist-label"><strong>${esc(r.lecture || `L${i + 1}`)}</strong><span>${esc(dateLabel(r.startMs))}</span><em>${r.n} responses${r.closed ? '' : ' · LIVE'}</em></div><div class="feedback-stack">${segs}</div></div>`;
     }).join('')}</div>`;
   }
 
@@ -256,7 +350,10 @@
     try {
       injectStyles();
       const events = await loadEvents();
-      render(buildTrend(events));
+      const liveRuns = buildTrend(events);
+      await persistClosedRuns(liveRuns);
+      const history = await loadSavedHistory();
+      render(history.length ? mergeHistory(history, liveRuns) : liveRuns);
       syncVisibility();
     } catch (e) {
       console.warn('BDA stable feedback trend:', e);
