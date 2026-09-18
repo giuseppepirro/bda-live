@@ -583,6 +583,18 @@
     }catch(error){ui.root.innerHTML=shell(`<section class="status-panel error-panel"><h2>Connection problem</h2><p>${esc(error.message)}</p><p class="muted">The page will retry automatically.</p></section>`,{kicker:VIEW==='present'?'PRESENTER':'STUDENT'});}finally{ui.refreshBusy=false;}
   }
 
+  function previewPresenterActive(value){
+    if(VIEW!=='present'||!ui.lastModel)return;
+    const active=String(value||'').trim();
+    if(/^ROUND:/i.test(active))return;
+    ui.lastModel=buildModel(active,ui.lastModel.questions,ui.lastModel.events);
+    renderPresenter(ui.lastModel);
+  }
+
+  window.addEventListener('bda-presenter-active-preview',event=>{
+    previewPresenterActive(event && event.detail && event.detail.value);
+  });
+
   function boot(){if(!ui.root)return;if(VIEW==='student')getBrowserId();refresh();setInterval(refresh,VIEW==='present'?(CFG.presenterPollMs||1200):(CFG.studentPollMs||1800));setInterval(tick,250);}
 
   window.BDA_LIVE_TEST={csvRows,parseEvent,encodeEvent,parseTimestamp,normalizeType,buildModel,sessionTiming,norm};
