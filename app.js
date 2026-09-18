@@ -316,13 +316,10 @@
   }
 
   async function ensureRegistration(model) {
-    if (VIEW !== 'student') return;
-    const state = registrationState(model);
-    if (state.status !== 'PENDING') return;
-    const last = Number(localStorage.getItem(STORAGE.registerAttempt) || 0);
-    if (Date.now() - last < (CFG.registrationRetryMs || 8000)) return;
-    localStorage.setItem(STORAGE.registerAttempt, String(Date.now()));
-    await submitEvent({type:'REGISTER',studentId:state.studentId,matricola:state.studentId,studentIdKind:'matricola',nickname:state.nickname,browserId:getBrowserId()});
+    // Registration is owned exclusively by registration-bootstrap.js + Apps Script.
+    // Never emit REGISTER events from the core app: old behavior could keep
+    // resubmitting stale identities after test data had been cleared.
+    return;
   }
 
   function answered(session, studentId) {
