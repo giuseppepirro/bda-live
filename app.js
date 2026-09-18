@@ -19,7 +19,9 @@
     lastModel: null,
     lastTimerState: null,
     refreshBusy: false,
-    forceStudentRender: true
+    forceStudentRender: true,
+    lastPresenterSignature: '',
+    lastPresenterViewKey: ''
   };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -531,27 +533,49 @@
     if(reset&&!reset.disabled) reset.onclick=async()=>{ui.pendingAction={type:'RESET',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'RESET',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not reset: ${e.message}`);}};
   }
 
+  function presenterSignature(model) {
+    const s=model.currentSession;
+    const timing=s?sessionTiming(s):null;
+    const answers=s?s.validAnswers.map(a=>`${a.studentId}:${a.answer}:${a.correct?'1':'0'}`).join('¦'):'';
+    const board=(model.leaderboard||[]).map(r=>`${r.nickname}:${r.points}:${r.correct}`).join('¦');
+    const p=ui.pendingAction;
+    return [model.activeId||'',model.off?'1':'0',s?.sessionId||'',timing?.state||'',answers,board,p?.type||'',p?.sessionId||'',p?.questionId||''].join('||');
+  }
+
+  function setPresenterHtml(model, html) {
+    const key=`${model.activeId||''}|${model.currentSession?.sessionId||'prepared'}`;
+    const same=ui.lastPresenterViewKey===key;
+    const y=same?window.scrollY:0;
+    ui.root.innerHTML=html;
+    ui.lastPresenterViewKey=key;
+    if(same && y>0){
+      requestAnimationFrame(()=>{
+        if(ui.lastPresenterViewKey===key) window.scrollTo(0,y);
+      });
+    }
+  }
+
   function renderPresenter(model) {
     reconcilePending(model);
     const registrationValue=String(CFG.registrationControlValue||'REGISTRATION').trim().toUpperCase();
     if(String(model.activeId||'').trim().toUpperCase()===registrationValue){
       if(!ui.root.querySelector('[data-registration-presenter]')){
-        ui.root.innerHTML=shell('<section class="status-panel presenter-wait"><h2>Student registration is open</h2><p>Waiting for registrations…</p></section>',{kicker:'PRESENTER · REGISTRATION OPEN',title:'Student registration'});
+        setPresenterHtml(model,shell('<section class="status-panel presenter-wait"><h2>Student registration is open</h2><p>Waiting for registrations…</p></section>',{kicker:'PRESENTER · REGISTRATION OPEN',title:'Student registration'}));
       }
       return;
     }
-    if(model.off){ui.root.innerHTML=shell(`${controls(model,null,null)}<section class="status-panel presenter-wait"><h2>Waiting for next question…</h2><p>B1 is set to OFF.</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside>`,{kicker:'PRESENTER · PAUSED',title:'BDA LIVE'});bindControls(model,null);return;}
+    if(model.off){setPresenterHtml(model,shell(`${controls(model,null,null)}<section class="status-panel presenter-wait"><h2>Waiting for next question…</h2><p>B1 is set to OFF.</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside>`,{kicker:'PRESENTER · PAUSED',title:'BDA LIVE'}));bindControls(model,null);return;}
     const q=model.activeQuestion;
-    if(!q){ui.root.innerHTML=shell('<section class="status-panel"><h2>Selected question not found</h2></section>',{kicker:'PRESENTER · SETUP ISSUE'});return;}
+    if(!q){setPresenterHtml(model,shell('<section class="status-panel"><h2>Selected question not found</h2></section>',{kicker:'PRESENTER · SETUP ISSUE'}));return;}
     const session=model.currentSession;
-    if(!session){ui.root.innerHTML=shell(`${controls(model,null,null)}<div class="presenter-grid"><section class="stage-card prepared-card"><div class="big-ready">READY</div><p>${q.duration}s · ${esc(q.type)}</p><p class="cue">${esc(q.teachingCue)}</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question});bindControls(model,null);return;}
+    if(!session){setPresenterHtml(model,shell(`${controls(model,null,null)}<div class="presenter-grid"><section class="stage-card prepared-card"><div class="big-ready">READY</div><p>${q.duration}s · ${esc(q.type)}</p><p class="cue">${esc(q.teachingCue)}</p></section><aside class="side-panel"><h3>Leaderboard</h3>${renderLeaderboard(model)}</aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question}));bindControls(model,null);return;}
     const timing=sessionTiming(session),closed=timing.state==='CLOSED';
     const scoredQuiz=q.type==='POLL'&&!!session.correctAnswer;
     const results=q.type==='POLL'?renderPoll(session,q,closed):(q.type==='WORDCLOUD'?renderWordCloud(session):renderOther(session));
     const reveal=closed&&scoredQuiz?`<div class="correct-reveal"><span>Correct answer</span><strong>${esc(session.correctAnswer)}</strong></div>`:'';
     const fastest=closed&&scoredQuiz?`<section class="mini-card"><h3>Fastest correct</h3>${renderFastest(session)}</section>`:'';
     const cloudSide=q.type==='WORDCLOUD'?`<section class="mini-card"><h3>Word frequency</h3>${renderWordFrequency(session)}</section>`:'';
-    ui.root.innerHTML=shell(`${controls(model,session,timing)}<div class="presenter-status-row">${timerHtml(session)}<div class="response-count"><strong>${session.validAnswers.length}</strong><span>RESPONSES</span></div><div class="state-pill ${closed?'closed':'open'}">${closed?'CLOSED':'OPEN'}</div></div>${reveal}<div class="presenter-grid"><section class="stage-card ${q.type==='WORDCLOUD'?'cloud-stage-card':''}">${results}</section><aside class="side-panel">${cloudSide}${fastest}<section class="mini-card"><h3>Leaderboard</h3>${renderLeaderboard(model)}</section><section class="mini-card teacher-note"><h3>Teaching cue</h3><p>${esc(q.teachingCue)}</p><small>${esc(q.source)}</small></section></aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question});
+    setPresenterHtml(model,shell(`${controls(model,session,timing)}<div class="presenter-status-row">${timerHtml(session)}<div class="response-count"><strong>${session.validAnswers.length}</strong><span>RESPONSES</span></div><div class="state-pill ${closed?'closed':'open'}">${closed?'CLOSED':'OPEN'}</div></div>${reveal}<div class="presenter-grid"><section class="stage-card ${q.type==='WORDCLOUD'?'cloud-stage-card':''}">${results}</section><aside class="side-panel">${cloudSide}${fastest}<section class="mini-card"><h3>Leaderboard</h3>${renderLeaderboard(model)}</section><section class="mini-card teacher-note"><h3>Teaching cue</h3><p>${esc(q.teachingCue)}</p><small>${esc(q.source)}</small></section></aside></div>`,{kicker:`PRESENTER · ${q.id} · ${q.week}`,title:q.question}));
     bindControls(model,session);
   }
 
@@ -562,7 +586,14 @@
 
   function render() {
     if(!ui.lastModel)return;
-    if(VIEW==='present')return renderPresenter(ui.lastModel);
+    if(VIEW==='present'){
+      const sig=presenterSignature(ui.lastModel);
+      if(sig!==ui.lastPresenterSignature){
+        ui.lastPresenterSignature=sig;
+        renderPresenter(ui.lastModel);
+      }
+      return;
+    }
     const sig=studentSignature(ui.lastModel);
     if(ui.forceStudentRender||sig!==ui.lastStudentSignature){ui.lastStudentSignature=sig;ui.forceStudentRender=false;renderStudent(ui.lastModel);}
   }
@@ -595,6 +626,7 @@
     ui.lastTimerState=null;
     if(/^ROUND:/i.test(active))return;
     ui.lastModel=buildModel(active,ui.lastModel.questions,ui.lastModel.events);
+    ui.lastPresenterSignature=presenterSignature(ui.lastModel);
     renderPresenter(ui.lastModel);
   }
 
