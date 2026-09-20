@@ -142,6 +142,15 @@
     });
   }
 
+  function presenterUnlocked() {
+    return !!(window.BDA_PRESENTER_AUTH && window.BDA_PRESENTER_AUTH.isAuthenticated && window.BDA_PRESENTER_AUTH.isAuthenticated());
+  }
+
+  async function submitPresenterEvent(event) {
+    if (!window.BDA_PRESENTER_MUTATE) throw new Error('Presenter authentication is not ready.');
+    return window.BDA_PRESENTER_MUTATE('event', {event: JSON.stringify({v:2, ...event})});
+  }
+
   async function loadActiveId() {
     const rows = csvRows(await fetchText(CFG.controlCsv));
     return ((rows[0] && rows[0][1]) || '').trim();
@@ -512,7 +521,8 @@
   function controls(model,session,timing) {
     const pending=ui.pendingAction;
     const pendingHere = pending && (!pending.questionId || pending.questionId === model.activeQuestion?.id);
-    return `<div class="presenter-controls"><button id="startQuestion" class="primary control" ${model.off||!model.activeQuestion||(session&&timing?.state==='OPEN')||(pendingHere&&pending?.type==='START')?'disabled':''}>${pendingHere&&pending?.type==='START'?'STARTING…':'START QUESTION'}</button><button id="endQuestion" class="secondary control" ${!session||timing?.state!=='OPEN'||(pendingHere&&pending?.type==='END')?'disabled':''}>${pendingHere&&pending?.type==='END'?'ENDING…':'END NOW'}</button><button id="resetQuestion" class="ghost control" ${!session||(pendingHere&&pending?.type==='RESET')?'disabled':''}>${pendingHere&&pending?.type==='RESET'?'RESETTING…':'RESET / PREPARE NEXT'}</button></div>`;
+    const locked=!presenterUnlocked();
+    return `<div class="presenter-controls"><button id="startQuestion" class="primary control" ${locked||model.off||!model.activeQuestion||(session&&timing?.state==='OPEN')||(pendingHere&&pending?.type==='START')?'disabled':''}>${pendingHere&&pending?.type==='START'?'STARTING…':'START QUESTION'}</button><button id="endQuestion" class="secondary control" ${locked||!session||timing?.state!=='OPEN'||(pendingHere&&pending?.type==='END')?'disabled':''}>${pendingHere&&pending?.type==='END'?'ENDING…':'END NOW'}</button><button id="resetQuestion" class="ghost control" ${locked||!session||(pendingHere&&pending?.type==='RESET')?'disabled':''}>${pendingHere&&pending?.type==='RESET'?'RESETTING…':'RESET / PREPARE NEXT'}</button></div>`;
   }
 
   function reconcilePending(model) {
@@ -528,9 +538,9 @@
 
   function bindControls(model,session) {
     const start=document.getElementById('startQuestion'),end=document.getElementById('endQuestion'),reset=document.getElementById('resetQuestion');
-    if(start&&!start.disabled) start.onclick=async()=>{const q=model.activeQuestion,sessionId=makeId('ses');ui.pendingAction={type:'START',sessionId,questionId:q.id,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'START',sessionId,questionId:q.id,questionType:q.type,duration:q.duration,correctAnswer:q.correctAnswer,launchSource:'Presenter'});}catch(e){ui.pendingAction=null;alert(`Could not start: ${e.message}`);}};
-    if(end&&!end.disabled) end.onclick=async()=>{ui.pendingAction={type:'END',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'END',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not end: ${e.message}`);}};
-    if(reset&&!reset.disabled) reset.onclick=async()=>{ui.pendingAction={type:'RESET',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitEvent({type:'RESET',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not reset: ${e.message}`);}};
+    if(start&&!start.disabled) start.onclick=async()=>{const q=model.activeQuestion,sessionId=makeId('ses');ui.pendingAction={type:'START',sessionId,questionId:q.id,at:Date.now()};renderPresenter(model);try{await submitPresenterEvent({type:'START',sessionId,questionId:q.id,questionType:q.type,duration:q.duration,correctAnswer:q.correctAnswer,launchSource:'Presenter'});}catch(e){ui.pendingAction=null;alert(`Could not start: ${e.message}`);}};
+    if(end&&!end.disabled) end.onclick=async()=>{ui.pendingAction={type:'END',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitPresenterEvent({type:'END',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not end: ${e.message}`);}};
+    if(reset&&!reset.disabled) reset.onclick=async()=>{ui.pendingAction={type:'RESET',sessionId:session.sessionId,questionId:session.questionId,at:Date.now()};renderPresenter(model);try{await submitPresenterEvent({type:'RESET',sessionId:session.sessionId,questionId:session.questionId});}catch(e){ui.pendingAction=null;alert(`Could not reset: ${e.message}`);}};
   }
 
   function presenterSignature(model) {
@@ -539,7 +549,7 @@
     const answers=s?s.validAnswers.map(a=>`${a.studentId}:${a.answer}:${a.correct?'1':'0'}`).join('¦'):'';
     const board=(model.leaderboard||[]).map(r=>`${r.nickname}:${r.points}:${r.correct}`).join('¦');
     const p=ui.pendingAction;
-    return [model.activeId||'',model.off?'1':'0',s?.sessionId||'',timing?.state||'',answers,board,p?.type||'',p?.sessionId||'',p?.questionId||''].join('||');
+    return [model.activeId||'',model.off?'1':'0',presenterUnlocked()?'AUTH':'LOCKED',s?.sessionId||'',timing?.state||'',answers,board,p?.type||'',p?.sessionId||'',p?.questionId||''].join('||');
   }
 
   function setPresenterHtml(model, html) {
@@ -638,6 +648,12 @@
 
   window.addEventListener('bda-presenter-active-preview',event=>{
     previewPresenterActive(event && event.detail && event.detail.value);
+  });
+
+  window.addEventListener('bda-presenter-auth-changed',()=>{
+    if(VIEW!=='present')return;
+    ui.lastPresenterSignature='';
+    render();
   });
 
   function boot(){if(!ui.root)return;if(VIEW==='student')getBrowserId();refresh();setInterval(refresh,VIEW==='present'?(CFG.presenterPollMs||1200):(CFG.studentPollMs||1800));setInterval(tick,250);}
