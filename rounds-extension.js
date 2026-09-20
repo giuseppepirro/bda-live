@@ -101,6 +101,15 @@
     await fetch(CFG.formAction,{method:'POST',mode:'no-cors',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
   }
 
+  function presenterUnlocked(){
+    return !!(window.BDA_PRESENTER_AUTH&&window.BDA_PRESENTER_AUTH.isAuthenticated&&window.BDA_PRESENTER_AUTH.isAuthenticated());
+  }
+
+  async function submitPresenterEvent(event){
+    if(!window.BDA_PRESENTER_MUTATE)throw new Error('Presenter authentication is not ready.');
+    return window.BDA_PRESENTER_MUTATE('event',{event:JSON.stringify({v:2,...event})});
+  }
+
   async function loadActiveId() {
     const rows=csvRows(await fetchText(CFG.controlCsv));
     return String((rows[0]&&rows[0][1])||'').trim();
@@ -314,15 +323,15 @@
   }
 
   function controls(round,run,t){
-    const pending=state.pending?.type;
-    return `<div class="presenter-controls"><button id="roundStart" class="primary control" ${run||pending==='START'?'disabled':''}>${pending==='START'?'STARTING…':'START ROUND'}</button><button id="roundEnd" class="secondary control" ${!run||t?.state!=='OPEN'||pending==='END'?'disabled':''}>${pending==='END'?'ENDING…':'END NOW'}</button><button id="roundReset" class="ghost control" ${!run||pending==='RESET'?'disabled':''}>${pending==='RESET'?'RESETTING…':'RESET / PREPARE NEXT'}</button></div>`;
+    const pending=state.pending?.type,locked=!presenterUnlocked();
+    return `<div class="presenter-controls"><button id="roundStart" class="primary control" ${locked||run||pending==='START'?'disabled':''}>${pending==='START'?'STARTING…':'START ROUND'}</button><button id="roundEnd" class="secondary control" ${locked||!run||t?.state!=='OPEN'||pending==='END'?'disabled':''}>${pending==='END'?'ENDING…':'END NOW'}</button><button id="roundReset" class="ghost control" ${locked||!run||pending==='RESET'?'disabled':''}>${pending==='RESET'?'RESETTING…':'RESET / PREPARE NEXT'}</button></div>`;
   }
 
   async function startRound(round,questions){
     if(!questions.length)return;
     const runId=makeId('rnd'); state.pending={type:'START',runId,at:Date.now()};
     const realDuration=round.mode==='PULSE'?0:round.duration;
-    await Promise.all(questions.map((q,index)=>submitEvent({
+    await Promise.all(questions.map((q,index)=>submitPresenterEvent({
       type:'START',sessionId:makeId('ses'),questionId:q.id,questionType:q.type,
       duration:HUGE_DURATION,correctAnswer:round.mode==='SCORED'?q.correctAnswer:'',launchSource:'Presenter · Round',
       roundId:round.id,roundRunId:runId,roundMode:round.mode,roundDuration:realDuration,roundIndex:index,roundQuestionCount:questions.length
@@ -331,12 +340,12 @@
 
   async function endRun(run){
     if(!run)return;state.pending={type:'END',runId:run.id,at:Date.now()};
-    await Promise.all(run.sessions.filter(s=>!s.end).map(s=>submitEvent({type:'END',sessionId:s.start.sessionId,questionId:s.start.questionId,roundId:s.start.roundId,roundRunId:s.start.roundRunId})));
+    await Promise.all(run.sessions.filter(s=>!s.end).map(s=>submitPresenterEvent({type:'END',sessionId:s.start.sessionId,questionId:s.start.questionId,roundId:s.start.roundId,roundRunId:s.start.roundRunId})));
   }
 
   async function resetRun(run){
     if(!run)return;state.pending={type:'RESET',runId:run.id,at:Date.now()};
-    await Promise.all(run.sessions.filter(s=>!s.reset).map(s=>submitEvent({type:'RESET',sessionId:s.start.sessionId,questionId:s.start.questionId,roundId:s.start.roundId,roundRunId:s.start.roundRunId})));
+    await Promise.all(run.sessions.filter(s=>!s.reset).map(s=>submitPresenterEvent({type:'RESET',sessionId:s.start.sessionId,questionId:s.start.questionId,roundId:s.start.roundId,roundRunId:s.start.roundRunId})));
   }
 
   function reconcilePending(run){
@@ -352,13 +361,13 @@
   }
 
   function presenterRoundSignature(round,questions,run){
-    if(!run)return [round.id,'READY',state.pending?.type||''].join('|');
+    if(!run)return [round.id,'READY',presenterUnlocked()?'AUTH':'LOCKED',state.pending?.type||''].join('|');
     const t=timing(round,run);
     const answers=questions.map(q=>{
       const s=roundSessionFor(run,q.id);
       return `${q.id}:${acceptedFor(s).map(a=>`${a.studentId}:${a.answer}`).join('¦')}`;
     }).join('||');
-    return [round.id,run.id,t.state,answers,state.pending?.type||''].join('||');
+    return [round.id,run.id,t.state,presenterUnlocked()?'AUTH':'LOCKED',answers,state.pending?.type||''].join('||');
   }
 
   function setRoundPresenterHtml(round,run,html){
@@ -507,6 +516,10 @@
     window.addEventListener('bda-presenter-active-confirmed',event=>{
       const value=String(event?.detail?.value||'').trim();
       if(state.previewActiveId===value)setTimeout(()=>{if(state.previewActiveId===value)state.previewActiveId='';},1800);
+    });
+    window.addEventListener('bda-presenter-auth-changed',()=>{
+      state.lastPresenterSignature='';
+      poll(state.previewActiveId||state.activeId);
     });
   }
 
