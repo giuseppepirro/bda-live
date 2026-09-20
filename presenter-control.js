@@ -77,7 +77,7 @@ function build(){
   if(document.getElementById('bdaPresenterControl'))return;
   const style=document.createElement('style');
   style.textContent=`
-    #bdaPresenterControl{position:sticky;top:0;z-index:10000;background:#111;color:#fff;padding:10px 16px;display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:10px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.18);font-family:Arial,sans-serif}
+    #bdaPresenterControl{position:sticky;top:46px;z-index:10000;background:#111;color:#fff;padding:10px 16px;display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:10px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.18);font-family:Arial,sans-serif}
     #bdaPresenterControl strong{font-size:12px;letter-spacing:.08em;white-space:nowrap}
     #bdaPresenterControl select{width:100%;min-width:0;padding:9px 10px;border-radius:9px;border:1px solid #555;background:#fff;color:#111;font-weight:700}
     #bdaPresenterControl button{padding:9px 14px;border:0;border-radius:9px;background:#b3131d;color:#fff;font-weight:900;cursor:pointer}
