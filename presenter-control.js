@@ -89,7 +89,7 @@ function build(){
 
   const host=document.createElement('div');host.id='bdaPresenterControl';
   const label=document.createElement('strong');label.textContent='ACTIVE ACTIVITY';
-  const select=document.createElement('select');select.id='bdaPresenterSelect';
+  const select=document.createElement('select');select.id='bdaPresenterSelect';select.disabled=!(window.BDA_PRESENTER_AUTH&&window.BDA_PRESENTER_AUTH.isAuthenticated&&window.BDA_PRESENTER_AUTH.isAuthenticated());
   const status=document.createElement('div');status.className='ctl-status';status.textContent='Ready';
   host.append(label,select,status);
   document.body.insertBefore(host,document.body.firstChild);
@@ -120,6 +120,11 @@ function build(){
 
   async function activate(value){
     if(busy)return;
+    if(!(window.BDA_PRESENTER_AUTH&&window.BDA_PRESENTER_AUTH.isAuthenticated&&window.BDA_PRESENTER_AUTH.isAuthenticated())){
+      status.textContent='LOCKED';
+      select.disabled=true;
+      return;
+    }
     value=normalizeSelection(value);
     const previous=lastActive;
     busy=true;
@@ -129,7 +134,10 @@ function build(){
     window.dispatchEvent(new CustomEvent('bda-presenter-active-preview',{detail:{value:value}}));
     try{
       let d=null;
-      try{d=await jsonp('setActive',{value:value},9000);}catch(e){}
+      try{
+        if(!window.BDA_PRESENTER_MUTATE)throw new Error('Presenter authentication is not ready.');
+        d=await window.BDA_PRESENTER_MUTATE('setActive',{value:value});
+      }catch(e){}
       let ok=!!(d&&d.ok);
       if(!ok)ok=await confirmViaSheet(value,9000);
       if(!ok)throw new Error('Could not confirm activity change');
@@ -146,7 +154,7 @@ function build(){
       console.warn('BDA presenter control:',e);
     }finally{
       busy=false;
-      select.disabled=false;
+      select.disabled=!(window.BDA_PRESENTER_AUTH&&window.BDA_PRESENTER_AUTH.isAuthenticated&&window.BDA_PRESENTER_AUTH.isAuthenticated());
     }
   }
   select.onchange=()=>activate(select.value);
@@ -154,13 +162,16 @@ function build(){
 async function sync(){
   try{
     const raw=await active();const a=normalizeSelection(raw);lastActive=a;if(window.BDA_ACTIVE_OVERRIDE===a)window.BDA_ACTIVE_OVERRIDE='';
-    const s=document.getElementById('bdaPresenterSelect');if(s&&document.activeElement!==s)s.value=a;
-    const st=document.querySelector('#bdaPresenterControl .ctl-status');if(st&&!busy)st.textContent='Active: '+a;
+    const s=document.getElementById('bdaPresenterSelect');
+    const unlocked=!!(window.BDA_PRESENTER_AUTH&&window.BDA_PRESENTER_AUTH.isAuthenticated&&window.BDA_PRESENTER_AUTH.isAuthenticated());
+    if(s){if(document.activeElement!==s)s.value=a;s.disabled=!unlocked||busy;}
+    const st=document.querySelector('#bdaPresenterControl .ctl-status');if(st&&!busy)st.textContent=unlocked?('Active: '+a):'LOCKED';
   }catch(e){}
 }
 async function boot(){
   try{await loadOptions();build();await sync();setInterval(sync,1500);}
   catch(e){console.error('BDA presenter control:',e);}
 }
+window.addEventListener('bda-presenter-auth-changed',()=>sync());
 boot();
 })();
