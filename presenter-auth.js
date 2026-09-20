@@ -122,7 +122,8 @@ function injectStyle(){
   const style=document.createElement('style');
   style.id='bdaPresenterAuthStyle';
   style.textContent=`
-    #bdaPresenterAuth{position:sticky;top:0;z-index:10050;background:#292929;color:#fff;padding:9px 16px;font-family:Arial,sans-serif;box-shadow:0 1px 0 rgba(255,255,255,.08) inset}
+    body.bda-presenter-auth-enabled{padding-bottom:62px!important}
+    #bdaPresenterAuth{position:fixed;left:0;right:0;bottom:0;z-index:10050;background:#292929;color:#fff;padding:9px 16px;font-family:Arial,sans-serif;box-shadow:0 -2px 12px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.08) inset}
     #bdaPresenterAuth .auth-inner{display:flex;gap:10px;align-items:center;justify-content:flex-end;max-width:1500px;margin:auto}
     #bdaPresenterAuth .auth-state{margin-right:auto;font-size:12px;font-weight:900;letter-spacing:.08em}
     #bdaPresenterAuth .auth-note{font-size:12px;color:#cfcfcf}
@@ -133,7 +134,7 @@ function injectStyle(){
     #bdaPresenterAuth button:disabled{opacity:.55;cursor:wait}
     body.bda-presenter-locked #bdaPresenterControl select{pointer-events:none;opacity:.55}
     body.bda-presenter-locked .presenter-controls button{pointer-events:none;opacity:.45}
-    @media(max-width:700px){#bdaPresenterAuth .auth-note{display:none}#bdaPresenterAuth input{min-width:150px;width:42vw}}
+    @media(max-width:700px){body.bda-presenter-auth-enabled{padding-bottom:76px!important}#bdaPresenterAuth .auth-note{display:none}#bdaPresenterAuth .auth-inner{gap:7px}#bdaPresenterAuth input{min-width:135px;width:40vw}}
   `;
   document.head.appendChild(style);
 }
@@ -144,8 +145,9 @@ function render(){
   if(!host){
     host=document.createElement('div');
     host.id='bdaPresenterAuth';
-    document.body.insertBefore(host,document.body.firstChild);
+    document.body.appendChild(host);
   }
+  document.body.classList.add('bda-presenter-auth-enabled');
   document.body.classList.toggle('bda-presenter-locked',!authState());
 
   if(authState()){
