@@ -215,14 +215,16 @@
     for (const r of closed) {
       savingRuns.add(r.id);
       try {
-        const result = await jsonp('saveLectureFeedback', {
+        if(!window.BDA_PRESENTER_AUTH || !window.BDA_PRESENTER_AUTH.isAuthenticated || !window.BDA_PRESENTER_AUTH.isAuthenticated()) continue;
+        if(!window.BDA_PRESENTER_MUTATE) continue;
+        const result = await window.BDA_PRESENTER_MUTATE('saveLectureFeedback', {
           runId: r.id,
           startMs: r.startMs,
           everything: r.counts['Everything'] || 0,
           p80: r.counts['80% to 99%'] || 0,
           p50: r.counts['50% to 79%'] || 0,
           under50: r.counts['Less than a half'] || 0
-        }, 9000);
+        });
         if (result && result.ok) savedRuns.add(r.id);
       } catch (e) {
         console.warn('BDA feedback history save:', e);
