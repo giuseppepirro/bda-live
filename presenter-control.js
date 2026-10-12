@@ -10,6 +10,7 @@ const FRIENDLY={
   Q0D:'Experience pulse · SQL comfort',
   Q0E:'Experience pulse · Largest dataset handled',
   Q0F:'Scale intuition · What makes data difficult at scale?',
+  Q0G:'MIDTERM participation · Will you take the midterm exam(s)?',
   QFB:'Lecture feedback · How much did the class understand?'
 };
 
