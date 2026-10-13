@@ -10,7 +10,7 @@ window.BDA_CONFIG = {
 
   // Question bank. Column J is the editable round membership.
   // ID, Week, Type, Question, Options, Correct answer, Teaching cue, Source, Time limit, Round.
-  questionsCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&headers=0&sheet=BDA%20LIVE%20Config&range=A4:J60',
+  questionsCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&headers=0&sheet=BDA%20LIVE%20Config&range=A4:J80',
 
   // Round definitions: Round ID, Label, Mode, Duration, Notes.
   roundsCsv: 'https://docs.google.com/spreadsheets/d/1-uu8VgqKawuOTh6JNHplNL8FDMnv-VevdFJFOy6hYmY/gviz/tq?tqx=out:csv&headers=1&sheet=BDA%20LIVE%20Rounds&range=A1:E30',
